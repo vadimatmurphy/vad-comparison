@@ -26,6 +26,9 @@ curl -L -o resources/silero_vad_v5.onnx \
 uv run python server.py
 ```
 
+<img width="1915" height="1051" alt="image" src="https://github.com/user-attachments/assets/0442c6ac-5cac-426a-8fa6-76bee14f4b17" />
+
+
 Open **http://localhost:8000** in your browser.
 
 ## How it works
