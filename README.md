@@ -17,6 +17,12 @@ curl -LsSf https://astral.sh/uv/install.sh | sh
 # Clone and run
 git clone https://github.com/vadimatmurphy/vad-comparison.git
 cd vad-comparison
+
+# Download the v5 ONNX model into resources/
+mkdir -p resources
+curl -L -o resources/silero_vad_v5.onnx \
+  "https://github.com/livekit/agents/raw/livekit-agents%401.2.6/livekit-plugins/livekit-plugins-silero/livekit/plugins/silero/resources/silero_vad.onnx"
+
 uv run python server.py
 ```
 
@@ -46,7 +52,7 @@ You can tweak these before recording:
 ├── compare_vad.py     # Core VAD engine — loads v5/v6 models
 ├── index.html         # Browser UI (vanilla HTML/JS, no build step)
 ├── resources/
-│   └── silero_vad_v5.onnx   # Silero VAD v5 ONNX model
+│   └── silero_vad_v5.onnx   # Silero VAD v5 ONNX model (download separately)
 ├── data/input/        # Sample audio files for testing
 └── pyproject.toml     # Dependencies
 ```
@@ -56,7 +62,7 @@ You can tweak these before recording:
 - [livekit-agents](https://github.com/livekit/agents) — audio utilities and VAD framework
 - [livekit-plugins-silero](https://github.com/livekit/agents) — Silero VAD v6 plugin
 - [FastAPI](https://fastapi.tiangolo.com/) + [uvicorn](https://www.uvicorn.org/) — web server
-- The v5 ONNX model is bundled in `resources/`
+- The v5 ONNX model must be downloaded separately (see Quick start)
 
 ## CLI comparison (optional)
 
