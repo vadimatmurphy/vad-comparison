@@ -1,0 +1,523 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Silero VAD v5 vs v6</title>
+<style>
+  :root {
+    --bg: #0f1117;
+    --surface: #1a1d27;
+    --border: #2a2d3a;
+    --text: #e1e4ed;
+    --muted: #8b8fa3;
+    --v5: #f59e0b;
+    --v5-bg: rgba(245, 158, 11, 0.08);
+    --v6: #3b82f6;
+    --v6-bg: rgba(59, 130, 246, 0.08);
+    --start: #22c55e;
+    --end: #ef4444;
+    --accent: #818cf8;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'SF Mono', 'Cascadia Code', 'Fira Code', monospace;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    padding: 24px;
+  }
+
+  h1 {
+    font-size: 1.3rem;
+    font-weight: 600;
+    margin-bottom: 4px;
+  }
+
+  .subtitle {
+    color: var(--muted);
+    font-size: 0.8rem;
+    margin-bottom: 24px;
+  }
+
+  .controls {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    flex-wrap: wrap;
+    margin-bottom: 20px;
+  }
+
+  button {
+    font-family: inherit;
+    font-size: 0.8rem;
+    padding: 8px 20px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: var(--surface);
+    color: var(--text);
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+
+  button:hover:not(:disabled) {
+    border-color: var(--accent);
+    background: rgba(129, 140, 248, 0.1);
+  }
+
+  button:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
+
+  button.recording {
+    border-color: var(--end);
+    background: rgba(239, 68, 68, 0.15);
+    color: var(--end);
+    animation: pulse 1.5s infinite;
+  }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.7; }
+  }
+
+  .params {
+    display: flex;
+    gap: 16px;
+    align-items: center;
+    font-size: 0.75rem;
+    color: var(--muted);
+  }
+
+  .params label { display: flex; align-items: center; gap: 6px; }
+
+  .params input {
+    font-family: inherit;
+    font-size: 0.75rem;
+    width: 60px;
+    padding: 4px 6px;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    background: var(--bg);
+    color: var(--text);
+  }
+
+  .timer {
+    font-size: 1.8rem;
+    font-weight: 300;
+    color: var(--muted);
+    margin-bottom: 20px;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .timer.active { color: var(--end); }
+
+  .columns {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    margin-bottom: 20px;
+  }
+
+  .column {
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+  }
+
+  .column-header {
+    padding: 10px 16px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .column.v5 .column-header { background: var(--v5-bg); color: var(--v5); }
+  .column.v6 .column-header { background: var(--v6-bg); color: var(--v6); }
+
+  .count {
+    font-size: 0.7rem;
+    opacity: 0.7;
+  }
+
+  .events {
+    height: 400px;
+    overflow-y: auto;
+    padding: 8px 0;
+  }
+
+  .event {
+    padding: 6px 16px;
+    font-size: 0.75rem;
+    display: flex;
+    gap: 10px;
+    align-items: baseline;
+    border-bottom: 1px solid rgba(42, 45, 58, 0.5);
+  }
+
+  .event:last-child { border-bottom: none; }
+
+  .event-time {
+    color: var(--muted);
+    min-width: 70px;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .event-badge {
+    font-size: 0.65rem;
+    font-weight: 600;
+    padding: 1px 6px;
+    border-radius: 3px;
+    text-transform: uppercase;
+    min-width: 40px;
+    text-align: center;
+  }
+
+  .event-badge.start {
+    color: var(--start);
+    background: rgba(34, 197, 94, 0.12);
+  }
+
+  .event-badge.end {
+    color: var(--end);
+    background: rgba(239, 68, 68, 0.12);
+  }
+
+  .event-detail { color: var(--muted); }
+
+  .playback-section {
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 16px;
+  }
+
+  .playback-header {
+    font-size: 0.8rem;
+    font-weight: 600;
+    margin-bottom: 12px;
+    color: var(--muted);
+  }
+
+  .playback-controls {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+  }
+
+  .no-audio {
+    font-size: 0.75rem;
+    color: var(--muted);
+    font-style: italic;
+  }
+
+  .summary {
+    margin-top: 20px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 16px;
+    font-size: 0.75rem;
+    color: var(--muted);
+    line-height: 1.6;
+  }
+
+  .summary strong { color: var(--text); }
+</style>
+</head>
+<body>
+
+<h1>Silero VAD v5 vs v6</h1>
+<p class="subtitle">Record from your microphone and compare voice activity detection in real time</p>
+
+<div class="controls">
+  <button id="btn-record" onclick="toggleRecording()">Record</button>
+  <button id="btn-clear" onclick="clearAll()" disabled>Clear</button>
+  <div class="params">
+    <label>min silence (s)
+      <input id="param-silence" type="number" value="0.5" step="0.1" min="0.1" max="2.0">
+    </label>
+    <label>min speech (s)
+      <input id="param-speech" type="number" value="0.1" step="0.05" min="0.01" max="1.0">
+    </label>
+  </div>
+</div>
+
+<div class="timer" id="timer">00:00.0</div>
+
+<div class="columns">
+  <div class="column v6">
+    <div class="column-header">
+      VAD v6
+      <span class="count" id="count-v6">0 events</span>
+    </div>
+    <div class="events" id="events-v6"></div>
+  </div>
+  <div class="column v5">
+    <div class="column-header">
+      VAD v5
+      <span class="count" id="count-v5">0 events</span>
+    </div>
+    <div class="events" id="events-v5"></div>
+  </div>
+</div>
+
+<div class="playback-section">
+  <div class="playback-header">Playback</div>
+  <div class="playback-controls">
+    <button id="btn-play" onclick="playAudio()" disabled>Play</button>
+    <button id="btn-stop-playback" onclick="stopPlayback()" disabled>Stop</button>
+    <span class="no-audio" id="playback-status">Record audio first</span>
+  </div>
+</div>
+
+<div class="summary" id="summary" style="display:none"></div>
+
+<script>
+const SAMPLE_RATE = 16000;
+let ws = null;
+let mediaStream = null;
+let audioContext = null;
+let processor = null;
+let recording = false;
+let startTime = 0;
+let timerInterval = null;
+
+// Recorded PCM chunks for playback
+let recordedChunks = [];
+let playbackSource = null;
+let playbackCtx = null;
+
+// Event counts
+let counts = { v5: 0, v6: 0 };
+let segments = { v5: [], v6: [] };
+
+function toggleRecording() {
+  if (recording) stopRecording();
+  else startRecording();
+}
+
+async function startRecording() {
+  const btn = document.getElementById('btn-record');
+  const btnClear = document.getElementById('btn-clear');
+
+  try {
+    mediaStream = await navigator.mediaDevices.getUserMedia({
+      audio: { sampleRate: SAMPLE_RATE, channelCount: 1, echoCancellation: false, noiseSuppression: false }
+    });
+  } catch (e) {
+    alert('Microphone access denied');
+    return;
+  }
+
+  clearAll();
+  btnClear.disabled = true;
+
+  // Connect WebSocket
+  const proto = location.protocol === 'https:' ? 'wss' : 'ws';
+  ws = new WebSocket(`${proto}://${location.host}/ws`);
+  ws.binaryType = 'arraybuffer';
+
+  ws.onopen = () => {
+    // Send params
+    ws.send(JSON.stringify({
+      min_silence_duration: parseFloat(document.getElementById('param-silence').value),
+      min_speech_duration: parseFloat(document.getElementById('param-speech').value),
+    }));
+
+    // Set up audio processing
+    audioContext = new AudioContext({ sampleRate: SAMPLE_RATE });
+    const source = audioContext.createMediaStreamSource(mediaStream);
+    processor = audioContext.createScriptProcessor(4096, 1, 1);
+
+    processor.onaudioprocess = (e) => {
+      if (!recording) return;
+      const float32 = e.inputBuffer.getChannelData(0);
+      const int16 = new Int16Array(float32.length);
+      for (let i = 0; i < float32.length; i++) {
+        int16[i] = Math.max(-32768, Math.min(32767, Math.round(float32[i] * 32767)));
+      }
+      recordedChunks.push(new Int16Array(int16));
+      if (ws.readyState === WebSocket.OPEN) {
+        ws.send(int16.buffer);
+      }
+    };
+
+    source.connect(processor);
+    processor.connect(audioContext.destination);
+  };
+
+  ws.onmessage = (e) => {
+    const event = JSON.parse(e.data);
+    addEvent(event);
+  };
+
+  ws.onclose = () => {};
+
+  recording = true;
+  startTime = Date.now();
+  btn.textContent = 'Stop';
+  btn.classList.add('recording');
+  document.getElementById('timer').classList.add('active');
+  timerInterval = setInterval(updateTimer, 100);
+}
+
+function stopRecording() {
+  recording = false;
+  const btn = document.getElementById('btn-record');
+  btn.textContent = 'Record';
+  btn.classList.remove('recording');
+  document.getElementById('timer').classList.remove('active');
+  document.getElementById('btn-clear').disabled = false;
+  clearInterval(timerInterval);
+
+  if (processor) { processor.disconnect(); processor = null; }
+  if (audioContext) { audioContext.close(); audioContext = null; }
+  if (mediaStream) { mediaStream.getTracks().forEach(t => t.stop()); mediaStream = null; }
+
+  if (ws && ws.readyState === WebSocket.OPEN) {
+    ws.send(new ArrayBuffer(0)); // signal stop
+    ws.close();
+  }
+  ws = null;
+
+  // Enable playback if we have audio
+  if (recordedChunks.length > 0) {
+    document.getElementById('btn-play').disabled = false;
+    const totalSamples = recordedChunks.reduce((s, c) => s + c.length, 0);
+    const dur = (totalSamples / SAMPLE_RATE).toFixed(1);
+    document.getElementById('playback-status').textContent = `${dur}s recorded`;
+  }
+
+  updateSummary();
+}
+
+function addEvent(event) {
+  const ver = event.version;
+  counts[ver]++;
+  document.getElementById(`count-${ver}`).textContent = `${counts[ver]} events`;
+
+  // Track segments for summary
+  if (event.type === 'start') {
+    segments[ver].push({ start: event.timestamp, end: null });
+  } else if (event.type === 'end') {
+    const open = segments[ver].findLast(s => s.end === null);
+    if (open) open.end = event.timestamp;
+  }
+
+  const container = document.getElementById(`events-${ver}`);
+  const div = document.createElement('div');
+  div.className = 'event';
+
+  const time = document.createElement('span');
+  time.className = 'event-time';
+  time.textContent = `${event.timestamp.toFixed(3)}s`;
+
+  const badge = document.createElement('span');
+  badge.className = `event-badge ${event.type}`;
+  badge.textContent = event.type === 'start' ? 'SOS' : 'EOS';
+
+  const detail = document.createElement('span');
+  detail.className = 'event-detail';
+  if (event.type === 'start') {
+    detail.textContent = `speech: ${event.speech_duration.toFixed(3)}s`;
+  } else {
+    detail.textContent = `silence: ${event.silence_duration.toFixed(3)}s`;
+  }
+
+  div.append(time, badge, detail);
+  container.appendChild(div);
+  container.scrollTop = container.scrollHeight;
+}
+
+function updateTimer() {
+  const elapsed = (Date.now() - startTime) / 1000;
+  const min = Math.floor(elapsed / 60).toString().padStart(2, '0');
+  const sec = Math.floor(elapsed % 60).toString().padStart(2, '0');
+  const ms = Math.floor((elapsed % 1) * 10);
+  document.getElementById('timer').textContent = `${min}:${sec}.${ms}`;
+}
+
+function clearAll() {
+  counts = { v5: 0, v6: 0 };
+  segments = { v5: [], v6: [] };
+  document.getElementById('events-v5').innerHTML = '';
+  document.getElementById('events-v6').innerHTML = '';
+  document.getElementById('count-v5').textContent = '0 events';
+  document.getElementById('count-v6').textContent = '0 events';
+  document.getElementById('timer').textContent = '00:00.0';
+  document.getElementById('summary').style.display = 'none';
+  document.getElementById('btn-play').disabled = true;
+  document.getElementById('playback-status').textContent = 'Record audio first';
+  recordedChunks = [];
+  stopPlayback();
+}
+
+function playAudio() {
+  if (recordedChunks.length === 0) return;
+  stopPlayback();
+
+  const totalSamples = recordedChunks.reduce((s, c) => s + c.length, 0);
+  playbackCtx = new AudioContext({ sampleRate: SAMPLE_RATE });
+  const buffer = playbackCtx.createBuffer(1, totalSamples, SAMPLE_RATE);
+  const channel = buffer.getChannelData(0);
+  let offset = 0;
+  for (const chunk of recordedChunks) {
+    for (let i = 0; i < chunk.length; i++) {
+      channel[offset++] = chunk[i] / 32768;
+    }
+  }
+
+  playbackSource = playbackCtx.createBufferSource();
+  playbackSource.buffer = buffer;
+  playbackSource.connect(playbackCtx.destination);
+  playbackSource.onended = () => {
+    document.getElementById('btn-stop-playback').disabled = true;
+    document.getElementById('playback-status').textContent = 'Finished';
+  };
+  playbackSource.start();
+
+  document.getElementById('btn-stop-playback').disabled = false;
+  document.getElementById('playback-status').textContent = 'Playing...';
+}
+
+function stopPlayback() {
+  if (playbackSource) {
+    try { playbackSource.stop(); } catch (e) {}
+    playbackSource = null;
+  }
+  if (playbackCtx) {
+    playbackCtx.close();
+    playbackCtx = null;
+  }
+  document.getElementById('btn-stop-playback').disabled = true;
+}
+
+function updateSummary() {
+  const el = document.getElementById('summary');
+  const v5Segs = segments.v5.filter(s => s.end !== null);
+  const v6Segs = segments.v6.filter(s => s.end !== null);
+  const v5Time = v5Segs.reduce((s, seg) => s + (seg.end - seg.start), 0);
+  const v6Time = v6Segs.reduce((s, seg) => s + (seg.end - seg.start), 0);
+
+  if (v5Segs.length === 0 && v6Segs.length === 0) return;
+
+  const diff = v5Segs.length - v6Segs.length;
+  let comparison = 'Both detected the same number of segments.';
+  if (diff > 0) comparison = `v5 detected <strong>${diff} more</strong> segment(s) than v6.`;
+  else if (diff < 0) comparison = `v6 detected <strong>${-diff} more</strong> segment(s) than v5.`;
+
+  el.innerHTML = `
+    <strong>Summary</strong><br>
+    v6: ${v6Segs.length} segments, ${v6Time.toFixed(2)}s total speech<br>
+    v5: ${v5Segs.length} segments, ${v5Time.toFixed(2)}s total speech<br>
+    ${comparison}
+  `;
+  el.style.display = 'block';
+}
+</script>
+</body>
+</html>
