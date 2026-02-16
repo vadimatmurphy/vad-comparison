@@ -22,5 +22,8 @@ uv.lock
 .DS_Store
 Thumbs.db
 
+# Models (download separately)
+*.onnx
+
 # Claude
 .claude/
